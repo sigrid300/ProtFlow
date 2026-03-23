@@ -183,7 +183,8 @@ class BackboneRMSD(Runner):
         # setup config
         config = require_config()
         self.script_dir = load_config_path(config, "AUXILIARY_RUNNER_SCRIPTS_DIR")
-        self.python = os.path.join(load_config_path(config, "PROTFLOW_ENV"), "python")
+        #self.python = os.path.join(load_config_path(config, "PROTFLOW_ENV"), "python")
+        self.python = load_config_path(config, "PROTFLOW_ENV")
 
         # runner setup
         self.set_ref_col(ref_col)
@@ -597,7 +598,8 @@ class MotifRMSD(Runner):
         """
         # setup config
         config = require_config()
-        self.python = os.path.join(load_config_path(config, "PROTFLOW_ENV"), "python")
+        #self.python = os.path.join(load_config_path(config, "PROTFLOW_ENV"), "python")
+        self.python = load_config_path(config, "PROTFLOW_ENV")
         self.script_dir = load_config_path(config, "AUXILIARY_RUNNER_SCRIPTS_DIR")
 
         #TODO implement MotifRMSD calculation based on Chain input (Should work now with a ChainSelector)!
@@ -1002,7 +1004,8 @@ class MotifSeparateSuperpositionRMSD(Runner):
         # setup config
         config = require_config()
         self.script_dir = load_config_path(config, "AUXILIARY_RUNNER_SCRIPTS_DIR")
-        self.python = os.path.join(load_config_path(config, "PROTFLOW_ENV"), "python")
+        #self.python = os.path.join(load_config_path(config, "PROTFLOW_ENV"), "python")
+        self.python = load_config_path(config, "PROTFLOW_ENV")
 
         #TODO implement MotifRMSD calculation based on Chain input (Should work now with a ChainSelector)!
         self.set_jobstarter(jobstarter)
