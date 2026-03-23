@@ -34,8 +34,9 @@ correct pose reindexing based on the RFDiffusion3 output naming scheme.
 
 RFDiffusion3 output structures are written as `.cif.gz` files with
 accompanying sidecar `.json` files containing metrics, specification
-data, and diffused index maps. These are parsed and flattened into
-a structured pandas DataFrame for integration into ProtFlow.
+data, and diffused index maps. These are parsed, decompressed,
+converted to .pdb format, and flattened into a structured pandas
+DataFrame for integration into ProtFlow.
 
 Usage
 -----
@@ -48,7 +49,7 @@ The runner will:
 2. Construct per-pose input JSON files.
 3. Generate shell commands.
 4. Execute jobs via JobStarter.
-5. Parse outputs and merge results back into the Poses object.
+5. Parse outputs, convert to .pdb format, and merge results back into the Poses object.
 
 Examples
 --------
@@ -94,6 +95,9 @@ Further Details
   GPU utilization. Index layers are collapsed after completion.
 - Robustness: Optional failure detection ensures missing
   outputs are caught early.
+- Format Conversion: RFDiffusion3 outputs (.cif.gz files) are
+  automatically decompressed and converted to .pdb format for
+  compatibility with downstream ProtFlow workflows.
 
 Notes
 -----
@@ -132,6 +136,7 @@ from protflow.runners import (
     options_flags_to_string,
     prepend_cmd,
 )
+from protflow.utils.biopython_tools import biopython_load_protein, save_structure_to_pdbfile
 
 class RFdiffusion3(Runner):
     """    RFdiffusion3 Runner Class
@@ -151,6 +156,7 @@ class RFdiffusion3(Runner):
         - Integration of results into the Poses DataFrame
         - Optional residue motif remapping
         - Optional multiplexing of poses for GPU scaling
+        - Conversion of .cif.gz outputs to .pdb format
 
     Important Implementation Details
     ---------------------------------
@@ -171,6 +177,10 @@ class RFdiffusion3(Runner):
        RFDiffusion3 outputs:
 
            <json_name>_<settings_group>_<batch_number>_model_<n>.cif.gz
+
+       Each structure is decompressed and converted to:
+
+           <json_name>_<settings_group>_<batch_number>_model_<n>.pdb
 
        Each structure has a corresponding sidecar `.json` file
        containing:
@@ -937,22 +947,87 @@ def _extract_score_dict(
     return out
 
 
-def _decompress_cif_gz(path: str) -> str:
-    """Decompress a .cif.gz file and return path to the decompressed .cif file."""
-    out_path = path.replace(".cif.gz", ".cif")
-    if not os.path.isfile(out_path):
-        with gzip.open(path, "rb") as f_in:
-            with open(out_path, "wb") as f_out:
+def save_as_pdb(cif_gz_path: str) -> str:
+    """
+    Decompress a .cif.gz file, load it using BioPython, and save as .pdb.
+    
+    This function takes a compressed CIF structure file produced by RFDiffusion3,
+    decompresses it, loads the structure using BioPython's flexible file parser,
+    and saves it in PDB format. The intermediate .cif file is then removed to
+    save disk space.
+    
+    Parameters
+    ----------
+    cif_gz_path : str
+        Path to the compressed .cif.gz file produced by RFDiffusion3.
+    
+    Returns
+    -------
+    str
+        Absolute path to the saved .pdb file.
+    
+    Raises
+    ------
+    FileNotFoundError
+        If the input .cif.gz file does not exist.
+    Exception
+        If decompression, loading, or saving fails.
+    
+    Notes
+    -----
+    - The output .pdb file will have the same basename as the input file,
+      with the extension changed from .cif.gz to .pdb.
+    - The intermediate decompressed .cif file is automatically removed
+      after successful conversion to minimize storage usage.
+    """
+    # Decompress the .cif.gz file to a temporary .cif file
+    cif_path = cif_gz_path.replace(".cif.gz", ".cif")
+    pdb_path = cif_gz_path.replace(".cif.gz", ".pdb")
+    
+    if not os.path.isfile(cif_gz_path):
+        raise FileNotFoundError(f"Input file not found: {cif_gz_path}")
+    
+    # Decompress only if the .cif file doesn't already exist
+    if not os.path.isfile(cif_path):
+        logging.info(f"Decompressing {cif_gz_path} to {cif_path}")
+        with gzip.open(cif_gz_path, "rb") as f_in:
+            with open(cif_path, "wb") as f_out:
                 shutil.copyfileobj(f_in, f_out)
-    return out_path
+    
+    # Load the structure using BioPython's flexible loader
+    try:
+        logging.info(f"Loading structure from {cif_path}")
+        structure = biopython_load_protein(cif_path, file_type="cif")
+    except Exception as e:
+        raise Exception(f"Failed to load structure from {cif_path}: {e}")
+    
+    # Save as PDB only if it doesn't already exist
+    if not os.path.isfile(pdb_path):
+        try:
+            logging.info(f"Saving structure to {pdb_path}")
+            save_structure_to_pdbfile(structure, pdb_path)
+        except Exception as e:
+            raise Exception(f"Failed to save structure to {pdb_path}: {e}")
+    
+    # Remove the intermediate .cif file to save disk space
+    if os.path.isfile(cif_path):
+        try:
+            os.remove(cif_path)
+            logging.info(f"Removed intermediate .cif file: {cif_path}")
+        except Exception as e:
+            logging.warning(f"Failed to remove intermediate .cif file {cif_path}: {e}")
+    
+    return os.path.abspath(pdb_path)
 
 
 def collect_scores(work_dir: str, include_scores: list[str] | None = None) -> pd.DataFrame:
-    """Parse runner outputs and return the canonical scores dataframe.
+    """
+    Parse runner outputs and return the canonical scores dataframe.
 
     Reads all .cif.gz output files from the outputs directory, decompresses
-    them, and parses their accompanying sidecar .json files for scores
-    including metrics, specification, and diffused_index_map entries.
+    them, converts them to .pdb format, and parses their accompanying sidecar
+    .json files for scores including metrics, specification, and diffused_index_map
+    entries.
 
     Parameters
     ----------
@@ -967,14 +1042,15 @@ def collect_scores(work_dir: str, include_scores: list[str] | None = None) -> pd
     pd.DataFrame
         One row per output structure with columns:
         - description: basename without extension
-        - location: absolute path to decompressed .cif file
+        - location: absolute path to the .pdb file
         - all scalar fields from sidecar JSON, flattened and prefixed
     """
     include_set = set(include_scores or [])
     output_dir = os.path.join(work_dir, "outputs")
     output_paths = sorted(glob(os.path.join(output_dir, "*.cif.gz")))
 
-    output_paths = [_decompress_cif_gz(path) for path in output_paths]
+    # Convert all .cif.gz files to .pdb format
+    output_paths = [save_as_pdb(path) for path in output_paths]
 
     rows: list[dict[str, object]] = []
     for path in output_paths:
