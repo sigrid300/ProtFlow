@@ -123,8 +123,7 @@ class SelectionIdentity(Runner):
     def __init__(self, residue_selection: Union[str, ResidueSelection] = None, onelettercode: bool = False, python_path: str|None = None, jobstarter: JobStarter = None, overwrite: bool = False): # pylint: disable=W0102
         # setup config
         config = require_config()
-        #self.set_python_path(python_path or os.path.join(load_config_path(config, "PROTFLOW_ENV"), "python"))
-        self.set_python_path(python_path or load_config_path(config, "PROTFLOW_ENV"))
+        self.set_python_path(python_path or os.path.join(load_config_path(config, "PROTFLOW_ENV"), "python"))
         # setup runner
         self.set_residue_selection(residue_selection)
         self.set_onelettercode(onelettercode)
