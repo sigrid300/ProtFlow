@@ -204,8 +204,7 @@ class ChainAdder(Runner):
         """
         # setup config
         config = require_config()
-        #self.python = python or os.path.join(load_config_path(config, "PROTFLOW_ENV"), "python")
-        self.python = python or load_config_path(config, "PROTFLOW_ENV")
+        self.python = python or os.path.join(load_config_path(config, "PROTFLOW_ENV"), "python")
         self.script_path = os.path.join(load_config_path(config, "AUXILIARY_RUNNER_SCRIPTS_DIR"), "add_chains_batch.py")
         self.jobstarter = jobstarter
 
@@ -822,8 +821,7 @@ class ChainRemover(Runner):
         """
         # setup config
         config = require_config()
-        #self.python = python or os.path.join(load_config_path(config, "PROTFLOW_ENV"), "python")
-        self.python = python or load_config_path(config, "PROTFLOW_ENV")
+        self.python = python or os.path.join(load_config_path(config, "PROTFLOW_ENV"), "python")
         self.script_path = os.path.join(load_config_path(config, "AUXILIARY_RUNNER_SCRIPTS_DIR"), "remove_chains_batch.py")
         self.jobstarter = jobstarter
 
@@ -962,8 +960,7 @@ class SequenceRemover(Runner):
         '''
         # setup config
         config = require_config()
-        #self.python = python or os.path.join(load_config_path(config, "PROTFLOW_ENV"), "python")
-        self.python = python or load_config_path(config, "PROTFLOW_ENV")
+        self.python = python or os.path.join(load_config_path(config, "PROTFLOW_ENV"), "python")
         self.script_path = os.path.join(load_config_path(config, "AUXILIARY_RUNNER_SCRIPTS_DIR"), "remove_sequence_batch.py")
         self.chains = chains
         self.sep = sep
@@ -1049,8 +1046,7 @@ class SequenceAdder(Runner):
         '''
         # setup config
         config = require_config()
-        #self.python = python or os.path.join(load_config_path(config, "PROTFLOW_ENV"), "python")
-        self.python = python or load_config_path(config, "PROTFLOW_ENV")
+        self.python = python or os.path.join(load_config_path(config, "PROTFLOW_ENV"), "python")
         self.script_path = os.path.join(load_config_path(config, "AUXILIARY_RUNNER_SCRIPTS_DIR"), "add_sequence_batch.py")
 
         _mutually_exclusive(sequence, "sequence", sequence_col, "sequence_col", none_ok=True)
